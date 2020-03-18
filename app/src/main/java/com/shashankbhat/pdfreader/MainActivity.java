@@ -1,31 +1,38 @@
 package com.shashankbhat.pdfreader;
 
-import androidx.appcompat.app.AppCompatActivity;
-
+import android.Manifest;
 import android.content.Context;
-import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.Environment;
-import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AppCompatActivity;
+
 import com.github.barteksc.pdfviewer.PDFView;
-import java.io.BufferedInputStream;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URL;
-import java.net.URLConnection;
+import com.karumi.dexter.Dexter;
+import com.karumi.dexter.listener.multi.MultiplePermissionsListener;
+import com.karumi.dexter.listener.multi.SnackbarOnAnyDeniedMultiplePermissionsListener;
+
+import butterknife.BindView;
+import butterknife.ButterKnife;
 
 public class MainActivity extends AppCompatActivity {
 
     private Context context;
-    private PDFView pdfView;
-    private EditText url;
-    private String root;
+
+    @BindView(R.id.pdfView)
+    PDFView pdfView;
+
+    @BindView(R.id.linearLayout)
+    LinearLayout linearLayout;
+
+    @BindView(R.id.show_pdf)
+    Button showPdfButton;
+
+    @BindView(R.id.url_edit_text)
+    EditText url_edit_text;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,66 +40,35 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         context = this;
+        ButterKnife.bind(this);
 
-        pdfView = findViewById(R.id.pdfView);
-
-        Button button = findViewById(R.id.submit);
-        url = findViewById(R.id.url);
+        requestPermission();
 
         //Default Pdf
-        url.setText("http://hortonworks.com/wp-content/uploads/2016/05/Hortonworks.CheatSheet.SQLtoHive.pdf");
+        url_edit_text.setText("http://hortonworks.com/wp-content/uploads/2016/05/Hortonworks.CheatSheet.SQLtoHive.pdf");
+        pdfView.fromAsset("paper.pdf").load();
 
-        root = Environment.getExternalStorageDirectory().toString();
-
-        button.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                if(!url.getText().toString().isEmpty())
-                    new RetrievePdfStream().execute(url.getText().toString());
-            }
+        showPdfButton.setOnClickListener(view -> {
+            String url = url_edit_text.getText().toString();
+            if (!url.isEmpty())
+                new RetrievePdfAsyncTask(context, pdfView).execute(url_edit_text.getText().toString());
+            else
+                Toast.makeText(context, "Empty URL", Toast.LENGTH_SHORT).show();
         });
     }
 
-    class RetrievePdfStream extends AsyncTask<String, Void, File> {
+    private void requestPermission() {
 
-        @Override
-        protected File doInBackground(String... strings) {
+        MultiplePermissionsListener snackbarMultiplePermissionsListener =
+                SnackbarOnAnyDeniedMultiplePermissionsListener.Builder
+                        .with(linearLayout, "Write to External Storage is needed to download the PDF and store it")
+                        .withOpenSettingsButton("Settings")
+                        .build();
 
-            try {
-
-                URL url = new URL(strings[0]);
-                URLConnection connection = url.openConnection();
-
-                int lengthOfFile = connection.getContentLength();
-                InputStream input = new BufferedInputStream(url.openStream(), lengthOfFile);
-
-                OutputStream output = new FileOutputStream(root+"/pdffile.pdf");
-
-                byte data[] = new byte[1024];
-
-                int count = 0;
-                while ((count = input.read(data)) != -1) {
-                    output.write(data, 0, count);
-                }
-
-                return new File(root+"/pdffile.pdf");
-
-            } catch (Exception e) {
-                Toast.makeText(context, e.getMessage(), Toast.LENGTH_SHORT).show();
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(File file) {
-            super.onPostExecute(file);
-            if (file != null) {
-                pdfView.fromFile(file).load();
-
-            }else{
-                pdfView.fromAsset("paper.pdf").load();
-                System.out.println("Offline");
-            }
-        }
+        Dexter.withActivity(this)
+                .withPermissions(
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                ).withListener(snackbarMultiplePermissionsListener).check();
     }
+
 }
