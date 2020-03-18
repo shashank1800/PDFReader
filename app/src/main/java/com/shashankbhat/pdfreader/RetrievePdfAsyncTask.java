@@ -1,6 +1,5 @@
 package com.shashankbhat.pdfreader;
 
-
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.os.AsyncTask;
